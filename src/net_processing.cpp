@@ -45,6 +45,7 @@
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <protocol.h>
+#include <psbt.h>
 #include <random.h>
 #include <scheduler.h>
 #include <script/script.h>
@@ -3765,6 +3766,52 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
 
         pfrom.fSuccessfullyConnected = true;
         return;
+    }
+
+    if (msg_type == NetMsgType::SIGNETPSBT) {
+        PartiallySignedTransaction psbt;
+        std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
+
+        vRecv >> psbt;
+        vRecv >> TX_WITH_WITNESS(*pblock);
+        const uint256 block_hash{pblock->GetHash()};
+
+        // TODO
+        // 1. Validate block template
+        //TODO
+        // 2. Verify that the PSBT commits to the block template according to BIP 325
+
+        // 3. Verify all current signatures in the PSBT (NOT TESTED)
+        bool should_retransmit = psbt_cache.add_signers(block_hash, psbt);
+
+        // Don't retransmit if the block has nothing new.
+        if(!should_retransmit) return;
+        // 4. If the PSBT does not have enough signatures to meet the multisig threshold AND this node has a Quorumeum multisig private key AND it has not signed the PSBT yet, it computes a signature and adds it to the PSBT, updating the message.
+        if(!psbt_cache.m_block_sigs[block_hash].finalized)
+        {
+            // TODO
+            // 1. Check if our signature is there
+            // 2. If not, add it
+
+            //3. Send the block with the PSBTs
+            m_connman.ForEachNode([&](CNode* pnode) {
+                MakeAndPushMessage(*pnode,
+                NetMsgType::SIGNETPSBT,
+                psbt_cache.m_block_sigs[block_hash].m_bestpsbt,
+                TX_WITH_WITNESS(*pblock));
+            });
+        }
+        // 5. If the PSBT has enough signatures to meet the multisig threshold:
+        else
+        {
+            //TODO - Grind the block header nonce until the proof of work is satisfied
+            //Relay the finished block to peers (untested)
+            m_connman.ForEachNode([&](CNode* pnode) {
+                MakeAndPushMessage(*pnode,
+                NetMsgType::SIGNETPSBT,
+                TX_WITH_WITNESS(*pblock));
+            });
+        }
     }
 
     if (msg_type == NetMsgType::SENDHEADERS) {
