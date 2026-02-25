@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "interfaces/wallet.h"
 #include <net_processing.h>
 
 #include <addrman.h>
@@ -502,7 +503,7 @@ class PeerManagerImpl final : public PeerManager
 public:
     PeerManagerImpl(CConnman& connman, AddrMan& addrman,
                     BanMan* banman, ChainstateManager& chainman,
-                    CTxMemPool& pool, node::Warnings& warnings, Options opts);
+                    CTxMemPool& pool, node::Warnings& warnings, Options opts, interfaces::WalletLoader& wallet_loader);
 
     /** Overridden from CValidationInterface. */
     void ActiveTipChange(const CBlockIndex& new_tip, bool) override
@@ -779,6 +780,8 @@ private:
     TimeOffsets m_outbound_time_offsets{m_warnings};
 
     const Options m_opts;
+
+    interfaces::WalletLoader& m_wallet_loader;
 
     bool RejectIncomingTxs(const CNode& peer) const;
 
@@ -1877,14 +1880,14 @@ std::optional<std::string> PeerManagerImpl::FetchBlock(NodeId peer_id, const CBl
 
 std::unique_ptr<PeerManager> PeerManager::make(CConnman& connman, AddrMan& addrman,
                                                BanMan* banman, ChainstateManager& chainman,
-                                               CTxMemPool& pool, node::Warnings& warnings, Options opts)
+                                               CTxMemPool& pool, node::Warnings& warnings, Options opts, interfaces::WalletLoader& wallet_loader)
 {
-    return std::make_unique<PeerManagerImpl>(connman, addrman, banman, chainman, pool, warnings, opts);
+    return std::make_unique<PeerManagerImpl>(connman, addrman, banman, chainman, pool, warnings, opts, wallet_loader);
 }
 
 PeerManagerImpl::PeerManagerImpl(CConnman& connman, AddrMan& addrman,
                                  BanMan* banman, ChainstateManager& chainman,
-                                 CTxMemPool& pool, node::Warnings& warnings, Options opts)
+                                 CTxMemPool& pool, node::Warnings& warnings, Options opts, interfaces::WalletLoader& wallet_loader)
     : m_rng{opts.deterministic_rng},
       m_fee_filter_rounder{CFeeRate{DEFAULT_MIN_RELAY_TX_FEE}, m_rng},
       m_chainparams(chainman.GetParams()),
@@ -1895,7 +1898,8 @@ PeerManagerImpl::PeerManagerImpl(CConnman& connman, AddrMan& addrman,
       m_mempool(pool),
       m_txdownloadman(node::TxDownloadOptions{pool, m_rng, opts.deterministic_rng}),
       m_warnings{warnings},
-      m_opts{opts}
+      m_opts{opts},
+      m_wallet_loader{wallet_loader}
 {
     // While Erlay support is incomplete, it must be enabled explicitly via -txreconciliation.
     // This argument can go away after Erlay support is complete.
@@ -5460,6 +5464,13 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
     PeerRef peer = GetPeerRef(pto->GetId());
     if (!peer) return false;
     const Consensus::Params& consensusParams = m_chainparams.GetConsensus();
+
+    auto wallets = m_wallet_loader.getWallets();
+    if (wallets.empty()) {
+        LogPrintf("\n\nTHERE'S NOT A WALLET :(((((((\n\n");
+    } else {
+        LogPrintf("\n\nTHERE'S A WALLET!!!!!\n\n");
+    }
 
     // We must call MaybeDiscourageAndDisconnect first, to ensure that we'll
     // disconnect misbehaving peers even before the version handshake is complete.
