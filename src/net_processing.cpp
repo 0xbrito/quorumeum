@@ -3807,6 +3807,7 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
         // 4. If the PSBT does not have enough signatures to meet the multisig threshold AND this node has a Quorumeum multisig private key AND it has not signed the PSBT yet, it computes a signature and adds it to the PSBT, updating the message.
         if(!psbt_cache.m_block_sigs[block_hash].finalized)
         {
+            std::unique_ptr<interfaces::Wallet> _wallet = GetQuorumWallet();
             // TODO
             // 1. Check if our signature is there
             // 2. If not, add it
