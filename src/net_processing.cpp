@@ -5581,13 +5581,6 @@ bool PeerManagerImpl::SendMessages(CNode* pto)
     if (!peer) return false;
     const Consensus::Params& consensusParams = m_chainparams.GetConsensus();
 
-    auto wallets = m_wallet_loader.getWallets();
-    if (wallets.empty()) {
-        LogPrintf("\n\nTHERE'S NOT A WALLET :(((((((\n\n");
-    } else {
-        LogPrintf("\n\nTHERE'S A WALLET!!!!!\n\n");
-    }
-
     // We must call MaybeDiscourageAndDisconnect first, to ensure that we'll
     // disconnect misbehaving peers even before the version handshake is complete.
     if (MaybeDiscourageAndDisconnect(*pto, *peer)) return true;
