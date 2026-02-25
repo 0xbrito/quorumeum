@@ -783,6 +783,8 @@ private:
 
     interfaces::WalletLoader& m_wallet_loader;
 
+    std::unique_ptr<interfaces::Wallet> GetQuorumWallet();
+
     bool RejectIncomingTxs(const CNode& peer) const;
 
     /** Whether we've completed initial sync yet, for determining when to turn
@@ -2360,6 +2362,18 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
             peer.m_continuation_block.SetNull();
         }
     }
+}
+
+std::unique_ptr<interfaces::Wallet> PeerManagerImpl::GetQuorumWallet()
+{
+    auto wallets = m_wallet_loader.getWallets();
+    for (auto& wallet : wallets) {
+        // TODO: we should agree on a name for the signing wallet and maybe move it to a constant?
+        if (wallet->getWalletName() == "quorate") {
+            return std::move(wallet);
+        }
+    }
+    return nullptr;
 }
 
 CTransactionRef PeerManagerImpl::FindTxForGetData(const Peer::TxRelay& tx_relay, const GenTxid& gtxid)
