@@ -600,6 +600,8 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
         "Additional flags \"in\" and \"out\" control whether permissions apply to incoming connections and/or manual (default: incoming only). "
         "Can be specified multiple times.", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
 
+    argsman.AddArg("-participate", strprintf("Enter into quorum voter mode, secret should be already in place. (default: %u)", false), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+
     g_wallet_init_interface.AddWalletOptions(argsman);
 
 #ifdef ENABLE_ZMQ
@@ -1821,6 +1823,14 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     // ********************************************************* Step 9: load wallet
     for (const auto& client : node.chain_clients) {
         if (!client->load()) {
+            return false;
+        }
+    }
+
+    if (args.GetBoolArg("-participate", false)) {
+        auto wallets = node.wallet_loader->getWallets();
+        if (wallets.empty()) {
+            InitError(_("Error: No Quorum secret loaded"));
             return false;
         }
     }
